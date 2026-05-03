@@ -1,0 +1,179 @@
+openapi: 3.0.3
+info:
+  title: BFF OpenAPI Support Token Validation
+  version: 1.0.0
+  description: API for validating authentication tokens from UX services.
+  contact:
+    name: Banco Fortaleza Financiera
+
+servers:
+  - url: /support/v1
+    description: Default server.
+
+tags:
+  - name: Authentication
+    description: Operations related to token validation.
+
+paths:
+  /auth/validate-token:
+    post:
+      tags:
+        - Authentication
+      summary: Validate token
+      description: Validates the access token sent in the request body.
+      operationId: validateToken
+      parameters:
+        - $ref: '#/components/parameters/XDeviceIpHeader'
+        - $ref: '#/components/parameters/XSessionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenValidationRequest'
+      responses:
+        '200':
+          description: Token validated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenValidationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  parameters:
+    XDeviceIpHeader:
+      name: x-device-ip
+      in: header
+      required: true
+      description: Client device IP address.
+      schema:
+        type: string
+        minLength: 7
+        maxLength: 45
+        pattern: '^(((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})|([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4})$'
+        example: "192.168.1.10"
+    XSessionHeader:
+      name: x-session
+      in: header
+      required: true
+      description: Client session identifier.
+      schema:
+        type: string
+        minLength: 36
+        maxLength: 36
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        example: "7f2c1a54-4cf0-4d8c-9b18-2a6a57e7f7f3"
+
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Invalid authentication token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    MethodNotAllowed:
+      description: Method not allowed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalServerError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    TokenValidationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        accessToken:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          description: Access token to validate.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        tokenType:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Token type.
+          example: "Bearer"
+      required:
+        - accessToken
+        - tokenType
+
+    TokenValidationResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        valid:
+          type: boolean
+          readOnly: true
+          description: Indicates whether the access token is valid.
+          example: true
+        idUser:
+          type: integer
+          format: int32
+          minimum: 1
+          readOnly: true
+          description: User identifier extracted from the token subject.
+          example: 10
+        xSession:
+          type: string
+          minLength: 36
+          maxLength: 36
+          readOnly: true
+          description: Session identifier extracted from the token.
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          example: "7f2c1a54-4cf0-4d8c-9b18-2a6a57e7f7f3"
+        expiresAt:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Token expiration date and time.
+          example: "2026-05-02T18:30:00Z"
+      required:
+        - valid
+        - idUser
+        - xSession
+        - expiresAt
+
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          minLength: 3
+          maxLength: 3
+          pattern: '^[0-9]{3}$'
+          example: "401"
+        message:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Invalid authentication token.
+        detail:
+          type: string
+          maxLength: 500
+          example: The submitted access token is invalid or expired.
+      required:
+        - code
+        - message

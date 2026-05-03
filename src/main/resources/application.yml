@@ -1,0 +1,51 @@
+server:
+  port: ${SERVER_PORT}
+
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: ${APP_NAME}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE}
+  endpoint:
+    health:
+      probes:
+        enabled: ${MANAGEMENT_HEALTH_PROBES_ENABLED}
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS}
+  info:
+    env:
+      enabled: ${MANAGEMENT_INFO_ENV_ENABLED}
+
+info:
+  app:
+    name: ${APP_NAME}
+
+logging:
+  pattern:
+    console: ${LOGGING_PATTERN_CONSOLE}
+  level:
+    com.bancofortaleza.transactions: ${LOGGING_LEVEL_APP}
+    org.springframework.web: ${LOGGING_LEVEL_SPRING_WEB}
+
+spring.cloud.openfeign:
+  okhttp:
+    enabled: ${FEIGN_OKHTTP_ENABLED}
+  client:
+    config:
+      default:
+        connectTimeout: ${FEIGN_CONNECT_TIMEOUT}
+        readTimeout: ${FEIGN_READ_TIMEOUT}
+        loggerLevel: ${FEIGN_LOGGER_LEVEL}
+
+support:
+  name: ${SUPPORT_SERVICE_NAME}
+  url: ${SUPPORT_SERVICE_URL}
+
+auth:
+  name: ${AUTH_SERVICE_NAME}
+  url: ${AUTH_SERVICE_URL}
