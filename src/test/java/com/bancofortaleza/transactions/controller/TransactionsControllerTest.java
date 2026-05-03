@@ -5,11 +5,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bancofortaleza.transactions.services.TransactionService;
+import com.bff.services.server.models.AccountStatementReportResponse;
 import com.bff.services.server.models.ConceptTransaction;
 import com.bff.services.server.models.Status;
 import com.bff.services.server.models.TransactionCreateRequest;
 import com.bff.services.server.models.TransactionResponse;
 import com.bff.services.server.models.TransactionStatusUpdateRequest;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -98,6 +100,25 @@ class TransactionsControllerTest {
                 ConceptTransaction.CREDIT,
                 Status.ACTIVE
         );
+    }
+
+    @Test
+    void generateAccountStatementReportShouldDelegateToService() {
+        // Arrange
+        LocalDate startDate = LocalDate.parse("2026-05-01");
+        LocalDate endDate = LocalDate.parse("2026-05-31");
+        ResponseEntity<AccountStatementReportResponse> expected =
+                ResponseEntity.ok(new AccountStatementReportResponse().idUser(10));
+        when(transactionService.generateAccountStatementReport(DEVICE_IP, SESSION, 10, startDate, endDate))
+                .thenReturn(expected);
+
+        // Act
+        ResponseEntity<AccountStatementReportResponse> response =
+                controller.generateAccountStatementReport(DEVICE_IP, SESSION, 10, startDate, endDate);
+
+        // Assert
+        assertThat(response).isSameAs(expected);
+        verify(transactionService).generateAccountStatementReport(DEVICE_IP, SESSION, 10, startDate, endDate);
     }
 
     @Test

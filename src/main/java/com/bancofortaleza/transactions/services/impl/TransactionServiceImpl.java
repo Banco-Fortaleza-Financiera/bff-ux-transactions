@@ -2,12 +2,11 @@ package com.bancofortaleza.transactions.services.impl;
 
 import com.bancofortaleza.transactions.configuration.SupportHeadersProvider;
 import com.bancofortaleza.transactions.services.TransactionService;
+import com.bancofortaleza.transactions.services.mapper.TransactionMapper;
 import com.bff.services.client.SupportApiClient;
-import com.bff.services.client.models.ConceptTransaction;
-import com.bff.services.client.models.Status;
-import com.bff.services.client.models.TransactionCreateRequest;
+import com.bff.services.client.models.AccountStatementReportResponse;
 import com.bff.services.client.models.TransactionResponse;
-import com.bff.services.client.models.TransactionStatusUpdateRequest;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -34,6 +33,7 @@ public class TransactionServiceImpl implements TransactionService {
 
     private final SupportApiClient supportApiClient;
     private final SupportHeadersProvider supportHeadersProvider;
+    private final TransactionMapper transactionMapper;
 
     @Override
     public ResponseEntity<com.bff.services.server.models.TransactionResponse> createTransaction(
@@ -45,12 +45,12 @@ public class TransactionServiceImpl implements TransactionService {
                 xDeviceIp,
                 xSession,
                 supportHeadersProvider.getAuthenticatedUserId(),
-                toClientRequest(transactionCreateRequest)
+                transactionMapper.toClientRequest(transactionCreateRequest)
         );
 
         return ResponseEntity.status(response.getStatusCode())
                 .headers(sanitizeHeaders(response.getHeaders()))
-                .body(toServerResponse(response.getBody()));
+                .body(transactionMapper.toServerResponse(response.getBody()));
     }
 
     @Override
@@ -64,7 +64,7 @@ public class TransactionServiceImpl implements TransactionService {
 
         return ResponseEntity.status(response.getStatusCode())
                 .headers(sanitizeHeaders(response.getHeaders()))
-                .body(toServerResponse(response.getBody()));
+                .body(transactionMapper.toServerResponse(response.getBody()));
     }
 
     @Override
@@ -86,17 +86,35 @@ public class TransactionServiceImpl implements TransactionService {
                 xPageSize,
                 search,
                 idAccount,
-                toClientConcept(concept),
-                toClientStatus(status)
+                transactionMapper.toClientConcept(concept),
+                transactionMapper.toClientStatus(status)
         );
-
-        List<com.bff.services.server.models.TransactionResponse> body = response.getBody() == null
-                ? null
-                : response.getBody().stream().map(this::toServerResponse).toList();
 
         return ResponseEntity.status(response.getStatusCode())
                 .headers(sanitizeHeaders(response.getHeaders()))
-                .body(body);
+                .body(transactionMapper.toServerTransactionResponses(response.getBody()));
+    }
+
+    @Override
+    public ResponseEntity<com.bff.services.server.models.AccountStatementReportResponse> generateAccountStatementReport(
+            String xDeviceIp,
+            String xSession,
+            Integer idUser,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        ResponseEntity<AccountStatementReportResponse> response = supportApiClient.generateAccountStatementReport(
+                xDeviceIp,
+                xSession,
+                supportHeadersProvider.getAuthenticatedUserId(),
+                idUser,
+                startDate,
+                endDate
+        );
+
+        return ResponseEntity.status(response.getStatusCode())
+                .headers(sanitizeHeaders(response.getHeaders()))
+                .body(transactionMapper.toServerResponse(response.getBody()));
     }
 
     @Override
@@ -111,66 +129,12 @@ public class TransactionServiceImpl implements TransactionService {
                 xSession,
                 supportHeadersProvider.getAuthenticatedUserId(),
                 id,
-                toClientRequest(transactionStatusUpdateRequest)
+                transactionMapper.toClientRequest(transactionStatusUpdateRequest)
         );
 
         return ResponseEntity.status(response.getStatusCode())
                 .headers(sanitizeHeaders(response.getHeaders()))
-                .body(toServerResponse(response.getBody()));
-    }
-
-    private TransactionCreateRequest toClientRequest(com.bff.services.server.models.TransactionCreateRequest request) {
-        if (request == null) {
-            return null;
-        }
-
-        return new TransactionCreateRequest()
-                .idAccount(request.getIdAccount())
-                .amount(request.getAmount())
-                .description(request.getDescription())
-                .concept(toClientConcept(request.getConcept()))
-                .status(toClientStatus(request.getStatus()));
-    }
-
-    private TransactionStatusUpdateRequest toClientRequest(com.bff.services.server.models.TransactionStatusUpdateRequest request) {
-        if (request == null) {
-            return null;
-        }
-
-        return new TransactionStatusUpdateRequest()
-                .status(toClientStatus(request.getStatus()));
-    }
-
-    private com.bff.services.server.models.TransactionResponse toServerResponse(TransactionResponse response) {
-        if (response == null) {
-            return null;
-        }
-
-        return new com.bff.services.server.models.TransactionResponse()
-                .id(response.getId())
-                .idAccount(response.getIdAccount())
-                .amount(response.getAmount())
-                .description(response.getDescription())
-                .concept(toServerConcept(response.getConcept()))
-                .status(toServerStatus(response.getStatus()))
-                .createdAt(response.getCreatedAt())
-                .updatedAt(response.getUpdatedAt());
-    }
-
-    private ConceptTransaction toClientConcept(com.bff.services.server.models.ConceptTransaction concept) {
-        return concept == null ? null : ConceptTransaction.fromValue(concept.getValue());
-    }
-
-    private com.bff.services.server.models.ConceptTransaction toServerConcept(ConceptTransaction concept) {
-        return concept == null ? null : com.bff.services.server.models.ConceptTransaction.fromValue(concept.getValue());
-    }
-
-    private Status toClientStatus(com.bff.services.server.models.Status status) {
-        return status == null ? null : Status.fromValue(status.getValue());
-    }
-
-    private com.bff.services.server.models.Status toServerStatus(Status status) {
-        return status == null ? null : com.bff.services.server.models.Status.fromValue(status.getValue());
+                .body(transactionMapper.toServerResponse(response.getBody()));
     }
 
     private HttpHeaders sanitizeHeaders(HttpHeaders source) {

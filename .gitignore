@@ -2,7 +2,6 @@
 .gradle/
 build/
 out/
-bin/
 *.class
 
 # Packaged artifacts
@@ -38,5 +37,4 @@ desktop.ini
 .env.*
 !.env.example
 
-bin/
 build/

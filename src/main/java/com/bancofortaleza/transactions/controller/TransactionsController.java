@@ -2,11 +2,13 @@ package com.bancofortaleza.transactions.controller;
 
 import com.bancofortaleza.transactions.services.TransactionService;
 import com.bff.services.server.ChannelApi;
+import com.bff.services.server.models.AccountStatementReportResponse;
 import com.bff.services.server.models.ConceptTransaction;
 import com.bff.services.server.models.Status;
 import com.bff.services.server.models.TransactionCreateRequest;
 import com.bff.services.server.models.TransactionResponse;
 import com.bff.services.server.models.TransactionStatusUpdateRequest;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +46,17 @@ public class TransactionsController implements ChannelApi {
             Status status
     ) {
         return transactionService.listTransactions(xDeviceIp, xSession, xPage, xPageSize, search, idAccount, concept, status);
+    }
+
+    @Override
+    public ResponseEntity<AccountStatementReportResponse> generateAccountStatementReport(
+            String xDeviceIp,
+            String xSession,
+            Integer idUser,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        return transactionService.generateAccountStatementReport(xDeviceIp, xSession, idUser, startDate, endDate);
     }
 
     @Override

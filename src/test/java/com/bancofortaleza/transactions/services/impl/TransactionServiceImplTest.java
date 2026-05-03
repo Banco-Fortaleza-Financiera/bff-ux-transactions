@@ -7,16 +7,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bancofortaleza.transactions.configuration.SupportHeadersProvider;
+import com.bancofortaleza.transactions.services.mapper.TransactionMapper;
 import com.bff.services.client.SupportApiClient;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,8 +37,16 @@ class TransactionServiceImplTest {
     @Mock
     private SupportHeadersProvider supportHeadersProvider;
 
-    @InjectMocks
     private TransactionServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        service = new TransactionServiceImpl(
+                supportApiClient,
+                supportHeadersProvider,
+                Mappers.getMapper(TransactionMapper.class)
+        );
+    }
 
     @Test
     void createTransactionShouldMapRequestHeadersAndResponse() {
@@ -190,6 +201,61 @@ class TransactionServiceImplTest {
     }
 
     @Test
+    void generateAccountStatementReportShouldDelegateAuthenticatedUserAndMapResponse() {
+        // Arrange
+        LocalDate startDate = LocalDate.parse("2026-05-01");
+        LocalDate endDate = LocalDate.parse("2026-05-31");
+        HttpHeaders downstreamHeaders = new HttpHeaders();
+        downstreamHeaders.add("x-report-id", "report-123");
+        downstreamHeaders.add(HttpHeaders.TRANSFER_ENCODING, "chunked");
+
+        when(supportHeadersProvider.getAuthenticatedUserId()).thenReturn(USER_ID);
+        when(supportApiClient.generateAccountStatementReport(DEVICE_IP, SESSION, USER_ID, 10, startDate, endDate))
+                .thenReturn(new ResponseEntity<>(clientAccountStatementReport(), downstreamHeaders, HttpStatus.OK));
+
+        // Act
+        ResponseEntity<com.bff.services.server.models.AccountStatementReportResponse> response =
+                service.generateAccountStatementReport(DEVICE_IP, SESSION, 10, startDate, endDate);
+
+        // Assert
+        verify(supportApiClient).generateAccountStatementReport(DEVICE_IP, SESSION, USER_ID, 10, startDate, endDate);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getHeaders().getFirst("x-report-id")).isEqualTo("report-123");
+        assertThat(response.getHeaders()).doesNotContainKey(HttpHeaders.TRANSFER_ENCODING);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getIdUser()).isEqualTo(10);
+        assertThat(response.getBody().getStartDate()).isEqualTo(startDate);
+        assertThat(response.getBody().getEndDate()).isEqualTo(endDate);
+        assertThat(response.getBody().getGeneratedAt()).isEqualTo(OffsetDateTime.parse("2026-05-31T23:59:59Z"));
+        assertThat(response.getBody().getTotalDebits()).isEqualByComparingTo("325.50");
+        assertThat(response.getBody().getTotalCredits()).isEqualByComparingTo("1500.00");
+        assertThat(response.getBody().getPdfBase64()).containsExactly("PDF".getBytes());
+        assertThat(response.getBody().getAccounts()).hasSize(1);
+        assertThat(response.getBody().getAccounts().getFirst().getIdAccount()).isEqualTo(5);
+        assertThat(response.getBody().getAccounts().getFirst().getTransactions()).hasSize(1);
+        assertThat(response.getBody().getAccounts().getFirst().getTransactions().getFirst().getConcept())
+                .isEqualTo(com.bff.services.server.models.ConceptTransaction.CREDIT);
+    }
+
+    @Test
+    void generateAccountStatementReportShouldAllowNullResponseBody() {
+        // Arrange
+        LocalDate startDate = LocalDate.parse("2026-05-01");
+        LocalDate endDate = LocalDate.parse("2026-05-31");
+        when(supportHeadersProvider.getAuthenticatedUserId()).thenReturn(USER_ID);
+        when(supportApiClient.generateAccountStatementReport(DEVICE_IP, SESSION, USER_ID, 10, startDate, endDate))
+                .thenReturn(ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+
+        // Act
+        ResponseEntity<com.bff.services.server.models.AccountStatementReportResponse> response =
+                service.generateAccountStatementReport(DEVICE_IP, SESSION, 10, startDate, endDate);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(response.getBody()).isNull();
+    }
+
+    @Test
     void updateTransactionStatusShouldMapRequestAndResponse() {
         // Arrange
         com.bff.services.server.models.TransactionStatusUpdateRequest request =
@@ -240,5 +306,28 @@ class TransactionServiceImplTest {
                 .status(com.bff.services.client.models.Status.ACTIVE)
                 .createdAt(OffsetDateTime.parse("2026-05-01T16:35:00Z"))
                 .updatedAt(OffsetDateTime.parse("2026-05-01T16:40:00Z"));
+    }
+
+    private com.bff.services.client.models.AccountStatementReportResponse clientAccountStatementReport() {
+        return new com.bff.services.client.models.AccountStatementReportResponse()
+                .idUser(10)
+                .startDate(LocalDate.parse("2026-05-01"))
+                .endDate(LocalDate.parse("2026-05-31"))
+                .generatedAt(OffsetDateTime.parse("2026-05-31T23:59:59Z"))
+                .totalDebits(new BigDecimal("325.50"))
+                .totalCredits(new BigDecimal("1500.00"))
+                .accounts(List.of(new com.bff.services.client.models.AccountStatementAccount()
+                        .idAccount(5)
+                        .accountNumber("0010001234567890")
+                        .balance(new BigDecimal("1500.75"))
+                        .totalDebits(new BigDecimal("125.50"))
+                        .totalCredits(new BigDecimal("750.00"))
+                        .transactions(List.of(new com.bff.services.client.models.AccountStatementTransaction()
+                                .id(1)
+                                .amount(new BigDecimal("250.75"))
+                                .description("Salary payment")
+                                .concept(com.bff.services.client.models.ConceptTransaction.CREDIT)
+                                .transactionDate(OffsetDateTime.parse("2026-05-01T16:35:00Z"))))))
+                .pdfBase64("PDF".getBytes());
     }
 }

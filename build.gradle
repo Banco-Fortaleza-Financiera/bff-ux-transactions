@@ -22,6 +22,7 @@ java {
 ext {
     springCloudVersion = '2023.0.3'
     lombokVersion = '1.18.34'
+    mapstructVersion = '1.6.3'
     generatedOpenApiDir = layout.buildDirectory.dir('generated').get().asFile
     generatedOpenApiJavaDir = "${generatedOpenApiDir}/src/main/java"
 }
@@ -34,15 +35,18 @@ dependencies {
     implementation 'io.github.openfeign:feign-okhttp'
     implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.25'
+    implementation "org.mapstruct:mapstruct:${mapstructVersion}"
 
     compileOnly "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.mockito:mockito-junit-jupiter'
     testImplementation 'org.assertj:assertj-core'
     testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
     testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+    testAnnotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
 }
 
 dependencyManagement {
