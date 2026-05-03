@@ -9,13 +9,28 @@ import com.bff.services.client.models.TransactionCreateRequest;
 import com.bff.services.client.models.TransactionResponse;
 import com.bff.services.client.models.TransactionStatusUpdateRequest;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class TransactionServiceImpl implements TransactionService {
+
+    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
+            HttpHeaders.CONNECTION.toLowerCase(Locale.ROOT),
+            HttpHeaders.CONTENT_LENGTH.toLowerCase(Locale.ROOT),
+            HttpHeaders.TRANSFER_ENCODING.toLowerCase(Locale.ROOT),
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "upgrade"
+    );
 
     private final SupportApiClient supportApiClient;
     private final SupportHeadersProvider supportHeadersProvider;
@@ -34,7 +49,7 @@ public class TransactionServiceImpl implements TransactionService {
         );
 
         return ResponseEntity.status(response.getStatusCode())
-                .headers(response.getHeaders())
+                .headers(sanitizeHeaders(response.getHeaders()))
                 .body(toServerResponse(response.getBody()));
     }
 
@@ -48,7 +63,7 @@ public class TransactionServiceImpl implements TransactionService {
         );
 
         return ResponseEntity.status(response.getStatusCode())
-                .headers(response.getHeaders())
+                .headers(sanitizeHeaders(response.getHeaders()))
                 .body(toServerResponse(response.getBody()));
     }
 
@@ -80,7 +95,7 @@ public class TransactionServiceImpl implements TransactionService {
                 : response.getBody().stream().map(this::toServerResponse).toList();
 
         return ResponseEntity.status(response.getStatusCode())
-                .headers(response.getHeaders())
+                .headers(sanitizeHeaders(response.getHeaders()))
                 .body(body);
     }
 
@@ -100,7 +115,7 @@ public class TransactionServiceImpl implements TransactionService {
         );
 
         return ResponseEntity.status(response.getStatusCode())
-                .headers(response.getHeaders())
+                .headers(sanitizeHeaders(response.getHeaders()))
                 .body(toServerResponse(response.getBody()));
     }
 
@@ -156,5 +171,19 @@ public class TransactionServiceImpl implements TransactionService {
 
     private com.bff.services.server.models.Status toServerStatus(Status status) {
         return status == null ? null : com.bff.services.server.models.Status.fromValue(status.getValue());
+    }
+
+    private HttpHeaders sanitizeHeaders(HttpHeaders source) {
+        HttpHeaders headers = new HttpHeaders();
+        source.forEach((name, values) -> {
+            if (!isHopByHopHeader(name)) {
+                values.forEach(value -> headers.add(name, value));
+            }
+        });
+        return headers;
+    }
+
+    private boolean isHopByHopHeader(String name) {
+        return HOP_BY_HOP_HEADERS.contains(name.toLowerCase(Locale.ROOT));
     }
 }

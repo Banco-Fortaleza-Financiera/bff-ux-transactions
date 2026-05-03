@@ -8,8 +8,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -28,6 +30,18 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
+        HttpHeaders.CONNECTION.toLowerCase(Locale.ROOT),
+        HttpHeaders.CONTENT_LENGTH.toLowerCase(Locale.ROOT),
+        HttpHeaders.TRANSFER_ENCODING.toLowerCase(Locale.ROOT),
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "upgrade"
+    );
 
     @ExceptionHandler(FeignException.class)
     public ResponseEntity<byte[]> handleFeignException(FeignException exception) {
@@ -206,10 +220,14 @@ public class GlobalExceptionHandler {
     private HttpHeaders toHttpHeaders(Map<String, Collection<String>> responseHeaders) {
         HttpHeaders headers = new HttpHeaders();
         responseHeaders.forEach((name, values) -> {
-            if (name != null && values != null) {
+            if (name != null && values != null && !isHopByHopHeader(name)) {
                 values.forEach(value -> headers.add(name, value));
             }
         });
         return headers;
+    }
+
+    private boolean isHopByHopHeader(String name) {
+        return HOP_BY_HOP_HEADERS.contains(name.toLowerCase(Locale.ROOT));
     }
 }
